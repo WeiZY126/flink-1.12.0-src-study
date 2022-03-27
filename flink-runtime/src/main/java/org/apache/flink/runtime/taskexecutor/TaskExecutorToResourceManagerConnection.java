@@ -115,6 +115,7 @@ public class TaskExecutorToResourceManagerConnection
 			this.taskExecutorRegistration = taskExecutorRegistration;
 		}
 
+		/*TODO 开始注册，调用的是这个方法*/
 		@Override
 		protected CompletableFuture<RegistrationResponse> invokeRegistration(
 				ResourceManagerGateway resourceManager, ResourceManagerId fencingToken, long timeoutMillis) throws Exception {

@@ -680,6 +680,7 @@ public class SlotManagerImpl implements SlotManager {
 						slotId)));
 		}
 
+		/*TODO 创建和注册新的这些slot*/
 		final TaskManagerSlot slot = createAndRegisterTaskManagerSlot(slotId, resourceProfile, taskManagerConnection);
 
 		final PendingTaskManagerSlot pendingTaskManagerSlot;
@@ -696,9 +697,12 @@ public class SlotManagerImpl implements SlotManager {
 			pendingSlots.remove(pendingTaskManagerSlot.getTaskManagerSlotId());
 			final PendingSlotRequest assignedPendingSlotRequest = pendingTaskManagerSlot.getAssignedPendingSlotRequest();
 
+			/*TODO 分配slot*/
 			if (assignedPendingSlotRequest == null) {
+				/*TODO 表示挂起的请求都已经满足了，3个slot，ys=2*/
 				handleFreeSlot(slot);
 			} else {
+				/*TODO 表示你要被分配给某个请求*/
 				assignedPendingSlotRequest.unassignPendingTaskManagerSlot();
 				allocateSlot(slot, assignedPendingSlotRequest);
 			}
@@ -1016,6 +1020,7 @@ public class SlotManagerImpl implements SlotManager {
 		taskManagerRegistration.markUsed();
 
 		// RPC call to the task manager
+		/*TODO 分配完之后通知TN提供slot给JM*/
 		CompletableFuture<Acknowledge> requestFuture = gateway.requestSlot(
 			slotId,
 			pendingSlotRequest.getJobId(),

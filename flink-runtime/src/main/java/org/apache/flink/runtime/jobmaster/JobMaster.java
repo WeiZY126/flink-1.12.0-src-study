@@ -810,6 +810,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		startHeartbeatServices();
 
 		// start the slot pool make sure the slot pool now accepts messages for this leader
+		/*TODO 启动slotpool*/
 		slotPool.start(getFencingToken(), getAddress(), getMainThreadExecutor());
 
 		//TODO: Remove once the ZooKeeperLeaderRetrieval returns the stored address upon start
@@ -820,6 +821,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		//   - activate leader retrieval for the resource manager
 		//   - on notification of the leader, the connection will be established and
 		//     the slot pool will start requesting slots
+		/*TODO 与Resourcemanager建立链接，slotpool开始申请资源*/
 		resourceManagerLeaderRetriever.start(new ResourceManagerLeaderListener());
 	}
 
@@ -889,6 +891,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 	}
 
 	private void startHeartbeatServices() {
+		//TODO 启动心跳服务，TaskManager和ResourceManager
 		taskManagerHeartbeatManager = heartbeatServices.createHeartbeatManagerSender(
 			resourceId,
 			new TaskManagerHeartbeatListener(),
@@ -1060,6 +1063,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 				resourceManagerGateway,
 				resourceManagerResourceId);
 
+			/*TODO slotPool链接到ResourceManager，请求资源*/
 			slotPool.connectToResourceManager(resourceManagerGateway);
 
 			resourceManagerHeartbeatManager.monitorTarget(resourceManagerResourceId, new HeartbeatTarget<Void>() {

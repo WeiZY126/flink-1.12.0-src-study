@@ -90,9 +90,11 @@ public abstract class RegisteredRpcConnection<F extends Serializable, G extends 
 		checkState(!closed, "The RPC connection is already closed");
 		checkState(!isConnected() && pendingRegistration == null, "The RPC connection is already started");
 
+		/*TODO 创建注册对象*/
 		final RetryingRegistration<F, G, S> newRegistration = createNewRegistration();
 
 		if (REGISTRATION_UPDATER.compareAndSet(this, null, newRegistration)) {
+			/*TODO 开始注册，注册成功红调用onRegistrationSuccess方法*/
 			newRegistration.startRegistration();
 		} else {
 			// concurrent start operation

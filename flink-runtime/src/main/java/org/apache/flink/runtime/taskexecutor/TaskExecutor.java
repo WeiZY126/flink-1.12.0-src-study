@@ -358,6 +358,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
 	@Override
 	public void onStart() throws Exception {
+		/*TODO 启动TaskExecutor服务*/
 		try {
 			startTaskExecutorServices();
 		} catch (Throwable t) {
@@ -915,6 +916,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		}
 
 		try {
+			/*TODO 根据RM的命令，分配自己的slot*/
 			allocateSlot(
 				slotId,
 				jobId,
@@ -950,6 +952,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		}
 
 		if (job.isConnected()) {
+			/*TODO 向JobManager提供slot*/
 			offerSlotsToJobManager(jobId);
 		}
 
