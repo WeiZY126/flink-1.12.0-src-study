@@ -270,6 +270,7 @@ public class AkkaRpcService implements RpcService {
 		ClassLoader classLoader = getClass().getClassLoader();
 
 		@SuppressWarnings("unchecked")
+			/*TODO 通过代理转发，最终转发到InvocationHandler进行处理*/
 		RpcServer server = (RpcServer) Proxy.newProxyInstance(
 			classLoader,
 			implementedRpcGateways.toArray(new Class<?>[implementedRpcGateways.size()]),

@@ -168,6 +168,7 @@ public abstract class RpcEndpoint implements RpcGateway, AutoCloseableAsync {
 	 * to process remote procedure calls.
 	 */
 	public final void start() {
+		/*TODO 终端的启动，实际上是由自身网关（RpcServer）来启动的*/
 		rpcServer.start();
 	}
 
