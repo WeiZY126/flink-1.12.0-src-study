@@ -124,6 +124,7 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 			declaringClass.equals(StartStoppable.class) ||
 			declaringClass.equals(MainThreadExecutable.class) ||
 			declaringClass.equals(RpcServer.class)) {
+			/*TODO 如果是网管类的调用，走这里*/
 			result = method.invoke(this, args);
 		} else if (declaringClass.equals(FencedRpcGateway.class)) {
 			throw new UnsupportedOperationException("AkkaInvocationHandler does not support the call FencedRpcGateway#" +
@@ -131,6 +132,7 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 				"fencing token. Please use RpcService#connect(RpcService, F, Time) with F being the fencing token to " +
 				"retrieve a properly FencedRpcGateway.");
 		} else {
+			/*TODO 如果不是网关类的，走这里，处理RPC请求*/
 			result = invokeRpc(method, args);
 		}
 
@@ -202,6 +204,7 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 		Annotation[][] parameterAnnotations = method.getParameterAnnotations();
 		Time futureTimeout = extractRpcTimeout(parameterAnnotations, args, timeout);
 
+		/*TODO 把消息封装成RPCInvocation，如果是本地，就创建local类型，如果是远程，就创建remote类型*/
 		final RpcInvocation rpcInvocation = createRpcInvocationMessage(methodName, parameterTypes, args);
 
 		Class<?> returnType = method.getReturnType();
@@ -209,16 +212,19 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 		final Object result;
 
 		if (Objects.equals(returnType, Void.TYPE)) {
+			/*TODO 如果方法的返回值是void，那么就使用tell方式*/
 			tell(rpcInvocation);
 
 			result = null;
 		} else {
+			//有返回值
 			// Capture the call stack. It is significantly faster to do that via an exception than
 			// via Thread.getStackTrace(), because exceptions lazily initialize the stack trace, initially only
 			// capture a lightweight native pointer, and convert that into the stack trace lazily when needed.
 			final Throwable callStackCapture = captureAskCallStack ? new Throwable() : null;
 
 			// execute an asynchronous call
+			/*TODO 有返回值，使用ask方式*/
 			final CompletableFuture<?> resultFuture = ask(rpcInvocation, futureTimeout);
 
 			final CompletableFuture<Object> completableFuture = new CompletableFuture<>();
@@ -231,9 +237,11 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 			});
 
 			if (Objects.equals(returnType, CompletableFuture.class)) {
+				/*TODO 如果返回类型是completableFuture,直接把completableFuture对象返回（不用阻塞）*/
 				result = completableFuture;
 			} else {
 				try {
+					/*TODO 如果返回类型不是completableFuture，那么就主动去获取结果（阻塞结果返回）*/
 					result = completableFuture.get(futureTimeout.getSize(), futureTimeout.getUnit());
 				} catch (ExecutionException ee) {
 					throw new RpcException("Failure while obtaining synchronous RPC result.", ExceptionUtils.stripExecutionException(ee));
