@@ -230,10 +230,12 @@ public class ExecutionGraphBuilder {
 				(System.nanoTime() - initMasterStart) / 1_000_000);
 
 		// topologically sort the job vertices and attach the graph to the existing one
+		/*TODO 对JobGraph进行拓扑排序，获取所有的JobVertex列表*/
 		List<JobVertex> sortedTopology = jobGraph.getVerticesSortedTopologicallyFromSources();
 		if (log.isDebugEnabled()) {
 			log.debug("Adding {} vertices from job graph {} ({}).", sortedTopology.size(), jobName, jobId);
 		}
+		/*TODO 核心逻辑，将拓扑排序过得JobGraph添加到executionGraph数据结构中*/
 		executionGraph.attachJobGraph(sortedTopology);
 
 		if (log.isDebugEnabled()) {
