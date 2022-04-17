@@ -176,6 +176,7 @@ public final class StreamTaskNetworkInput<T> implements StreamTaskInput<T> {
 
 	private void processElement(StreamElement recordOrMark, DataOutput<T> output) throws Exception {
 		if (recordOrMark.isRecord()){
+			//如果是Map算子。emitRecord应该在OneInputStreamTask.java调用
 			output.emitRecord(recordOrMark.asRecord());
 		} else if (recordOrMark.isWatermark()) {
 			statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), lastChannel, output);

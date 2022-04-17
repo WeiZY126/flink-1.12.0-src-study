@@ -196,6 +196,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 	protected void startSchedulingInternal() {
 		log.info("Starting scheduling with scheduling strategy [{}]", schedulingStrategy.getClass().getName());
 		prepareExecutionGraphForNgScheduling();
+		//新版本中，默认的调度策略是pipelinedRegion
 		schedulingStrategy.startScheduling();
 	}
 

@@ -528,6 +528,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 	@Override
 	public final void invoke() throws Exception {
 		try {
+			//调用前的准备工作
 			beforeInvoke();
 
 			// final check to exit early before starting to run
@@ -536,6 +537,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			}
 
 			// let the task do its work
+			/*TODO 核心逻辑 运行任务*/
 			runMailboxLoop();
 
 			// if this left the run() method cleanly despite the fact that this was canceled,

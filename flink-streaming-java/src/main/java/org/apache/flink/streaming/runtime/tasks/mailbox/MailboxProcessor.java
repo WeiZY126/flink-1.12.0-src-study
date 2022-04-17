@@ -183,6 +183,7 @@ public class MailboxProcessor implements Closeable {
 			// The blocking `processMail` call will not return until default action is available.
 			processMail(localMailbox, false);
 			if (isMailboxLoopRunning()) {
+				//邮箱默认操作在StreamTask构造器中指定，为processInput
 				mailboxDefaultAction.runDefaultAction(defaultActionContext); // lock is acquired inside default action as needed
 			}
 		}
