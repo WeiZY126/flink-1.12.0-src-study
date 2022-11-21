@@ -277,16 +277,20 @@ public class SlotPoolImpl implements SlotPool {
 	//  Resource Manager Connection
 	// ------------------------------------------------------------------------
 
+	//TODO JobMaster连接上ResourceManager时会调用
 	@Override
 	public void connectToResourceManager(@Nonnull ResourceManagerGateway resourceManagerGateway) {
 		this.resourceManagerGateway = checkNotNull(resourceManagerGateway);
 
 		// work on all slots waiting for this connection
+		//TODO 遍历保存在等待ResourceManager连接上的slot请求列表（waitingForResourceManager）
 		for (PendingRequest pendingRequest : waitingForResourceManager.values()) {
+			//TODO 处理向Resourcemanager申请slot的请求
 			requestSlotFromResourceManager(resourceManagerGateway, pendingRequest);
 		}
 
 		// all sent off
+		//TODO 清空等待ResourceManager连接上的slot请求列表
 		waitingForResourceManager.clear();
 	}
 
@@ -309,36 +313,50 @@ public class SlotPoolImpl implements SlotPool {
 	@Nonnull
 	private CompletableFuture<AllocatedSlot> requestNewAllocatedSlotInternal(PendingRequest pendingRequest) {
 
+		//TODO 检查是否连接上ResourceManager
 		if (resourceManagerGateway == null) {
+			//TODO 将slot请求记录在等待连接上ResourceManager的请求列表中
+			/**防止未连接上ResourceManager，Slot请求丢失，连接后会调用{@link #connectToResourceManager}处理*/
 			stashRequestWaitingForResourceManager(pendingRequest);
 		} else {
+			//TODO 处理向ResourceManager申请请求
 			requestSlotFromResourceManager(resourceManagerGateway, pendingRequest);
 		}
 
 		return pendingRequest.getAllocatedSlotFuture();
 	}
 
+	//TODO SlotPool向ResourceManager发起slot请求
 	private void requestSlotFromResourceManager(
 			final ResourceManagerGateway resourceManagerGateway,
 			final PendingRequest pendingRequest) {
 
+		//TODO 检查连接和待分配slot请求有效性
 		checkNotNull(resourceManagerGateway);
 		checkNotNull(pendingRequest);
 
+		//TODO 1）创建分配ID（allocationId），该ID贯穿ResourceManager和TaskExecutor的Slot分配请求
 		final AllocationID allocationId = new AllocationID();
 		pendingRequest.setAllocationId(allocationId);
 
+		//TODO 2）将本次slot请求添加进待分配请求列表（pendingRequests）中
 		pendingRequests.put(pendingRequest.getSlotRequestId(), allocationId, pendingRequest);
 
+		//TODO 3）提前监控本次Slot请求的分配完成情况（获取pendingRequset的AllocatedSlotFuture）来处理异常分配情况
 		pendingRequest.getAllocatedSlotFuture().whenComplete(
 			(AllocatedSlot allocatedSlot, Throwable throwable) -> {
+				//当以分配异常返回
 				if (throwable != null) {
 					// the allocation id can be remapped so we need to get it from the pendingRequest
 					// where it will be updated timely
+					//TODO 获取已完成请求的申请ID
 					final Optional<AllocationID> updatedAllocationId = pendingRequest.getAllocationId();
 
 					if (updatedAllocationId.isPresent()) {
+						//TODO 如果申请ID存在，取消申请slot
 						// cancel the slot request if there is a failure
+						/**当 {@link #requestNewAllocatedSlot(SlotRequestId, ResourceProfile, Time)}
+						 * * 中申请超时时就会执行取消本次向RM发送slot申请请求的逻辑*/
 						resourceManagerGateway.cancelSlotRequest(updatedAllocationId.get());
 					}
 				}
@@ -347,6 +365,8 @@ public class SlotPoolImpl implements SlotPool {
 		log.info("Requesting new slot [{}] and profile {} with allocation id {} from resource manager.",
 			pendingRequest.getSlotRequestId(), pendingRequest.getResourceProfile(), allocationId);
 
+		//TODO 4）向ResourceManager发起申请Slot的请求，通过RPC调用
+		/**{@link ResourceManager#requestSlot}方法*/
 		CompletableFuture<Acknowledge> rmResponse = resourceManagerGateway.requestSlot(
 			jobMasterId,
 			new SlotRequest(jobId, allocationId, pendingRequest.getResourceProfile(), jobManagerAddress),
@@ -358,6 +378,7 @@ public class SlotPoolImpl implements SlotPool {
 			(Acknowledge ignored, Throwable failure) -> {
 				// on failure, fail the request future
 				if (failure != null) {
+					//TODO 请求异常时执行向ResourceManager请求Slot失败的逻辑
 					slotRequestToResourceManagerFailed(pendingRequest.getSlotRequestId(), failure);
 				}
 			});
@@ -422,6 +443,7 @@ public class SlotPoolImpl implements SlotPool {
 		}
 	}
 
+	//TODO 从schedule向SlotPool发起slot申请的入口
 	@Nonnull
 	@Override
 	public CompletableFuture<PhysicalSlot> requestNewAllocatedSlot(
@@ -429,10 +451,14 @@ public class SlotPoolImpl implements SlotPool {
 			@Nonnull ResourceProfile resourceProfile,
 			@Nullable Time timeout) {
 
+		//TODO 检查是否处理消息的主线程，以防多线程访问
 		componentMainThreadExecutor.assertRunningInMainThread();
 
+		//TODO 创建流式待分配的Slot请求pendingRequest
 		final PendingRequest pendingRequest = PendingRequest.createStreamingRequest(slotRequestId, resourceProfile);
 
+		//TODO 注册申请超时时间（如果申请超过超时时间，会以超时的原因终止此次待分配的slot请求）
+		//slot.request.timeout(默认300s)
 		if (timeout != null) {
 			// register request timeout
 			FutureUtils
@@ -449,6 +475,7 @@ public class SlotPoolImpl implements SlotPool {
 					});
 		}
 
+		//TODO 执行requestNewAllocatedSlotInternal，执行后继续向ResourceManager发起Slot申请的请求
 		return requestNewAllocatedSlotInternal(pendingRequest)
 			.thenApply((Function.identity()));
 	}
@@ -1382,17 +1409,22 @@ public class SlotPoolImpl implements SlotPool {
 	 */
 	protected static class PendingRequest {
 
+		//本次Slot请求的唯一标志
 		private final SlotRequestId slotRequestId;
 
+		//SlotRequest需要的资源情况
 		private final ResourceProfile resourceProfile;
 
+		//区分是批式还是流式请求
 		private final boolean isBatchRequest;
 
+		//CompletableFuture，用来表示Slot分配完成的情况
 		private final CompletableFuture<AllocatedSlot> allocatedSlotFuture;
 
 		@Nullable
 		private AllocationID allocationId;
 
+		//用于批式，判断批式Slot申请分配超时
 		private long unfillableSince;
 
 		private PendingRequest(
