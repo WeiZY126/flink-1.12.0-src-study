@@ -452,6 +452,13 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		closeJobManagerConnection(jobId, cause);
 	}
 
+	/**
+	 * TODO jobMaster远程调用* .
+	 * @param jobMasterId id of the JobMaster
+	 * @param slotRequest The slot to request
+	 * @param timeout
+	 * @return
+	 */
 	@Override
 	public CompletableFuture<Acknowledge> requestSlot(
 			JobMasterId jobMasterId,
@@ -461,6 +468,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 		JobID jobId = slotRequest.getJobId();
 		JobManagerRegistration jobManagerRegistration = jobManagerRegistrations.get(jobId);
 
+		//TODO 检测jobMaster是否已注册
 		if (null != jobManagerRegistration) {
 			if (Objects.equals(jobMasterId, jobManagerRegistration.getJobMasterId())) {
 				log.info("Request slot with profile {} for job {} with allocation id {}.",

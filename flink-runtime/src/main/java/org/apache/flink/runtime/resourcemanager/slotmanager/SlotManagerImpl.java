@@ -382,8 +382,11 @@ public class SlotManagerImpl implements SlotManager {
 	 */
 	@Override
 	public boolean registerSlotRequest(SlotRequest slotRequest) throws ResourceManagerException {
+		//TODO 检查是否已经启动（检查started属性）
 		checkInit();
 
+		//TODO 检查申请的Slot请求是否已经提交过
+		//TODO 检查待分配或者已经完成和活跃的Slot申请Map中是否存在该Slot的getAllocationId
 		if (checkDuplicateRequest(slotRequest.getAllocationId())) {
 			LOG.debug("Ignoring a duplicate slot request with allocation id {}.", slotRequest.getAllocationId());
 
@@ -394,6 +397,7 @@ public class SlotManagerImpl implements SlotManager {
 			pendingSlotRequests.put(slotRequest.getAllocationId(), pendingSlotRequest);
 
 			try {
+				//TODO 执行Slot和待分配请求匹配的逻辑
 				internalRequestSlot(pendingSlotRequest);
 			} catch (ResourceManagerException e) {
 				// requesting the slot failed --> remove pending slot request
@@ -873,10 +877,14 @@ public class SlotManagerImpl implements SlotManager {
 	 * @throws ResourceManagerException if the slot request failed or is unfulfillable
 	 */
 	private void internalRequestSlot(PendingSlotRequest pendingSlotRequest) throws ResourceManagerException {
+		//TODO 获取申请资源规格
 		final ResourceProfile resourceProfile = pendingSlotRequest.getResourceProfile();
 
+		//TODO 先根据资源规格匹配SlotManager的空闲slot列表
 		OptionalConsumer.of(findMatchingSlot(resourceProfile))
+			//TODO 如果匹配，完成分配过程
 			.ifPresent(taskManagerSlot -> allocateSlot(taskManagerSlot, pendingSlotRequest))
+			//TODO 如果没匹配上，则匹配该待分配请求和申请TaskManager
 			.ifNotPresent(() -> fulfillPendingSlotRequestWithPendingTaskManagerSlot(pendingSlotRequest));
 	}
 

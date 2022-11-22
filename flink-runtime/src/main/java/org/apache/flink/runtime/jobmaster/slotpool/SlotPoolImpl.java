@@ -355,8 +355,8 @@ public class SlotPoolImpl implements SlotPool {
 					if (updatedAllocationId.isPresent()) {
 						//TODO 如果申请ID存在，取消申请slot
 						// cancel the slot request if there is a failure
-						/**当 {@link #requestNewAllocatedSlot(SlotRequestId, ResourceProfile, Time)}
-						 * * 中申请超时时就会执行取消本次向RM发送slot申请请求的逻辑*/
+						/**当 {@link #requestNewAllocatedSlot}
+						 * 中申请超时时就会执行取消本次向RM发送slot申请请求的逻辑*/
 						resourceManagerGateway.cancelSlotRequest(updatedAllocationId.get());
 					}
 				}
@@ -385,16 +385,23 @@ public class SlotPoolImpl implements SlotPool {
 	}
 
 	private void slotRequestToResourceManagerFailed(SlotRequestId slotRequestID, Throwable failure) {
+		//TODO 判断待分配的Slot请求中是否有对应的待分配请求
 		final PendingRequest request = pendingRequests.getValueByKeyA(slotRequestID);
+		//如果有
 		if (request != null) {
+			//如果是批且可忽略，不处理
 			if (isBatchRequestAndFailureCanBeIgnored(request, failure)) {
 				log.debug("Ignoring failed request to the resource manager for a batch slot request.");
 			} else {
+				//TODO 如果是流式，从列表移除待分配的Slot请求
 				removePendingRequest(slotRequestID);
+				//TODO 将对应Slot分配请求情况以异常返回
+				/**会触发{@link #requestSlotFromResourceManager}中的3）取消此次请求*/
 				request.getAllocatedSlotFuture().completeExceptionally(new NoResourceAvailableException(
 					"No pooled slot available and request to ResourceManager for new slot failed", failure));
 			}
 		} else {
+			//如果没有，不做处理
 			if (log.isDebugEnabled()) {
 				log.debug("Unregistered slot request [{}] failed.", slotRequestID, failure);
 			}
