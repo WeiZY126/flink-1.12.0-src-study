@@ -414,6 +414,7 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 			getMainThreadExecutor());
 	}
 
+	/*Slot注册到ResourceManager*/
 	@Override
 	public CompletableFuture<Acknowledge> sendSlotReport(ResourceID taskManagerResourceId, InstanceID taskManagerRegistrationId, SlotReport slotReport, Time timeout) {
 		final WorkerRegistration<WorkerType> workerTypeWorkerRegistration = taskExecutors.get(taskManagerResourceId);
