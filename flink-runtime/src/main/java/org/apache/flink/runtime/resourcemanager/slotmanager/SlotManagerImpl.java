@@ -471,6 +471,7 @@ public class SlotManagerImpl implements SlotManager {
 	public boolean registerTaskManager(
 		final TaskExecutorConnection taskExecutorConnection,
 		SlotReport initialSlotReport) {
+		//TODO 检测SlotManagerImpl是否已经启动
 		checkInit();
 
 		LOG.debug(
@@ -479,7 +480,9 @@ public class SlotManagerImpl implements SlotManager {
 			taskExecutorConnection.getInstanceID());
 
 		// we identify task managers by their instance id
+		//TODO 检测TaskManager是否首次注册
 		if (taskManagerRegistrations.containsKey(taskExecutorConnection.getInstanceID())) {
+			//TODO 如果非首次，直接汇报TaskManager状态
 			reportSlotStatus(taskExecutorConnection.getInstanceID(), initialSlotReport);
 			return false;
 		} else {
@@ -494,6 +497,7 @@ public class SlotManagerImpl implements SlotManager {
 			}
 
 			// first register the TaskManager
+			//首次注册和汇报Slot的TaskManager
 			ArrayList<SlotID> reportedSlots = new ArrayList<>();
 
 			for (SlotStatus slotStatus : initialSlotReport) {
@@ -504,11 +508,13 @@ public class SlotManagerImpl implements SlotManager {
 				taskExecutorConnection,
 				reportedSlots);
 
+			//TODO 将来注册的TaskManager注册到已注册的TaskManager列表
 			taskManagerRegistrations.put(
 				taskExecutorConnection.getInstanceID(),
 				taskManagerRegistration);
 
 			// next register the new slots
+			//TODO 注册TaskManager所有汇报的Slot
 			for (SlotStatus slotStatus : initialSlotReport) {
 				registerSlot(
 					slotStatus.getSlotID(),
@@ -739,8 +745,10 @@ public class SlotManagerImpl implements SlotManager {
 		ResourceProfile resourceProfile,
 		TaskExecutorConnection taskManagerConnection) {
 
+		//TODO 检测是否首次注册
 		if (slots.containsKey(slotId)) {
 			// remove the old slot first
+			//TODO 从已注册的TaskManagerSlot列表里移除老的注册Slot
 			removeSlot(
 				slotId,
 				new SlotManagerException(
@@ -758,23 +766,26 @@ public class SlotManagerImpl implements SlotManager {
 		final PendingTaskManagerSlot pendingTaskManagerSlot;
 
 		if (allocationId == null) {
+			//TODO 匹配待分配Slot的申请
 			pendingTaskManagerSlot = findExactlyMatchingPendingTaskManagerSlot(resourceProfile);
 		} else {
 			pendingTaskManagerSlot = null;
 		}
 
 		if (pendingTaskManagerSlot == null) {
+			//TODO 匹配不到则直接更新TaskManagerSlot的状态
 			updateSlot(slotId, allocationId, jobId);
 		} else {
 			pendingSlots.remove(pendingTaskManagerSlot.getTaskManagerSlotId());
+			//TODO 检测待分配Slot申请是否绑定待申请资源的Slot
 			final PendingSlotRequest assignedPendingSlotRequest = pendingTaskManagerSlot.getAssignedPendingSlotRequest();
 
 			/*TODO 分配slot*/
 			if (assignedPendingSlotRequest == null) {
-				/*TODO 表示挂起的请求都已经满足了，3个slot，ys=2*/
+				/*TODO 未绑定待申请资源的Slot，执行将TaskManagerSlot置为空闲的逻辑*/
 				handleFreeSlot(slot);
 			} else {
-				/*TODO 表示你要被分配给某个请求*/
+				/*TODO 有绑定带申请资源的Slot，执行待分配该Slot的逻辑*/
 				assignedPendingSlotRequest.unassignPendingTaskManagerSlot();
 				allocateSlot(slot, assignedPendingSlotRequest);
 			}
@@ -876,31 +887,43 @@ public class SlotManagerImpl implements SlotManager {
 		TaskManagerRegistration taskManagerRegistration,
 		@Nullable AllocationID allocationId,
 		@Nullable JobID jobId) {
+		//TODO 如果allocationId不为空，则表示TaskManagerSlot对应TaskExecutor的Slot已被分配占有
 		if (null != allocationId) {
 			switch (slot.getState()) {
+				//TODO 当状态为PENDING时
 				case PENDING:
 					// we have a pending slot request --> check whether we have to reject it
+					//TODO 找到与TaskManagerSlot绑定的待分配Slot申请
 					PendingSlotRequest pendingSlotRequest = slot.getAssignedSlotRequest();
 
+					//TODO 比较待分配Slot申请的allocationId与汇报的Slot的allocationId是否相等
 					if (Objects.equals(pendingSlotRequest.getAllocationId(), allocationId)) {
 						// we can cancel the slot request because it has been fulfilled
+						//TODO 取消待分配的Slot申请
 						cancelPendingSlotRequest(pendingSlotRequest);
 
 						// remove the pending slot request, since it has been completed
+						//TODO 从待分配的Slot申请列表中移除
 						pendingSlotRequests.remove(pendingSlotRequest.getAllocationId());
 
+						//TODO 标记本次申请成功，同时从PENDING->ALLOCATED状态
 						slot.completeAllocation(allocationId, jobId);
 					} else {
 						// we first have to free the slot in order to set a new allocationId
+						//TODO 如果不相等
+						//TODO 将TaskManagerSlot绑定的待分配Slot申请拒绝掉
 						slot.clearPendingSlotRequest();
 						// set the allocation id such that the slot won't be considered for the pending slot request
+						//TODO 根据汇报的Slot的allocationId匹配待分配Slot的申请
 						slot.updateAllocation(allocationId, jobId);
 
 						// remove the pending request if any as it has been assigned
+						//TODO 将匹配的待分配Slot申请从待分配的Slot申请列表中移除
 						final PendingSlotRequest actualPendingSlotRequest = pendingSlotRequests.remove(
 							allocationId);
 
 						if (actualPendingSlotRequest != null) {
+							//TODO 将匹配的待分配Slot申请取消
 							cancelPendingSlotRequest(actualPendingSlotRequest);
 						}
 
@@ -911,27 +934,39 @@ public class SlotManagerImpl implements SlotManager {
 								+ " being already allocated."));
 					}
 
+					//TODO 标记本次Slot申请完成，同时从PENDING->ALLOCATED状态
 					taskManagerRegistration.occupySlot();
 					break;
+				//TODO 当状态为ALLOCATED时
 				case ALLOCATED:
+					//TODO 如果TaskManagerSlot的分配ID与汇报Slot的分配ID不一致
 					if (!Objects.equals(allocationId, slot.getAllocationId())) {
+						//TODO 先释放 ALLOCATED->FREE
 						slot.freeSlot();
+						//TODO 后占有，将分配ID变为汇报的ID FREE->ALLOCATED
 						slot.updateAllocation(allocationId, jobId);
 					}
 					break;
+				//TODO 当状态为FREE时
 				case FREE:
 					// the slot is currently free --> it is stored in freeSlots
+					//TODO 将TaskManagerSlot从空闲列表中移除
 					freeSlots.remove(slot.getSlotId());
+					//TODO 将分配ID设置为汇报的Slot分配ID
 					slot.updateAllocation(allocationId, jobId);
+					//TODO TaskManagerSlot从FREE->ALLOCATED
 					taskManagerRegistration.occupySlot();
 					break;
 			}
 
 			fulfilledSlotRequests.put(allocationId, slot.getSlotId());
+			//TODO 如果allocationId为空，则表示汇报的TaskManagerSlot对应TaskExecutor的Slot未被分配占有
 		} else {
 			// no allocation reported
 			switch (slot.getState()) {
+				//TODO 当TaskManagerSlot为空闲状态
 				case FREE:
+					//TODO 检查是否具有匹配的待分配Slot申请供其匹配
 					handleFreeSlot(slot);
 					break;
 				case PENDING:
@@ -939,10 +974,14 @@ public class SlotManagerImpl implements SlotManager {
 					break;
 				case ALLOCATED:
 					AllocationID oldAllocation = slot.getAllocationId();
+					//TODO 释放TaskManagerSlot
 					slot.freeSlot();
+					//TODO 从已分配完成列表中移除
 					fulfilledSlotRequests.remove(oldAllocation);
+					//TODO 从ALLOCATED->FREE
 					taskManagerRegistration.freeSlot();
 
+					//TODO 检查是否具有匹配的待分配Slot申请供其匹配
 					handleFreeSlot(slot);
 					break;
 			}
@@ -1213,13 +1252,18 @@ public class SlotManagerImpl implements SlotManager {
 	 * @param freeSlot to find a new slot request for
 	 */
 	private void handleFreeSlot(TaskManagerSlot freeSlot) {
+		//TODO 检查TaskManagerSlot是否为空闲状态，如果不空闲则直接抛出异常
 		Preconditions.checkState(freeSlot.getState() == SlotState.FREE);
 
+		//TODO 检查待分配Slot列表中是否存在与TaskManagerSlot资源规格一样且未被绑定的Slot申请
 		PendingSlotRequest pendingSlotRequest = findMatchingRequest(freeSlot.getResourceProfile());
 
+		//如果存在
 		if (null != pendingSlotRequest) {
+			//TODO 将TaskManagerSlot分配给他们
 			allocateSlot(freeSlot, pendingSlotRequest);
 		} else {
+			//TODO 将TaskManagerSlot添加到空闲Slot列表中
 			freeSlots.put(freeSlot.getSlotId(), freeSlot);
 		}
 	}

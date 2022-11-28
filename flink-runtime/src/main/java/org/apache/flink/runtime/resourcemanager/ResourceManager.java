@@ -419,7 +419,9 @@ public abstract class ResourceManager<WorkerType extends ResourceIDRetrievable>
 	public CompletableFuture<Acknowledge> sendSlotReport(ResourceID taskManagerResourceId, InstanceID taskManagerRegistrationId, SlotReport slotReport, Time timeout) {
 		final WorkerRegistration<WorkerType> workerTypeWorkerRegistration = taskExecutors.get(taskManagerResourceId);
 
+		//TODO 判断该TaskManager是否注册到ResourceManager
 		if (workerTypeWorkerRegistration.getInstanceID().equals(taskManagerRegistrationId)) {
+			//TODO 处理Slot注册与分配的逻辑
 			if (slotManager.registerTaskManager(workerTypeWorkerRegistration, slotReport)) {
 				onWorkerRegistered(workerTypeWorkerRegistration.getWorker());
 			}
