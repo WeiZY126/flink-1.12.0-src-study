@@ -288,9 +288,11 @@ public class TaskSlotTableImpl<T extends TaskSlotPayload> implements TaskSlotTab
 
 		Preconditions.checkArgument(index < numberSlots);
 
+		//TODO 判断本次申请ID是否已经分配过Slot
 		TaskSlot<T> taskSlot = allocatedSlots.get(allocationId);
 		if (taskSlot != null) {
 			LOG.info("Allocation ID {} is already allocated in {}.", allocationId, taskSlot);
+			//TODO 返回分配失败的标记
 			return false;
 		}
 
@@ -394,9 +396,11 @@ public class TaskSlotTableImpl<T extends TaskSlotPayload> implements TaskSlotTab
 
 		TaskSlot<T> taskSlot = getTaskSlot(allocationId);
 
+		//TODO 检查分配ID是否占有Slot
 		if (taskSlot != null) {
 			return freeSlotInternal(taskSlot, cause).isDone() ? taskSlot.getIndex() : -1;
 		} else {
+			//不需要释放
 			throw new SlotNotFoundException(allocationId);
 		}
 	}
@@ -410,6 +414,7 @@ public class TaskSlotTableImpl<T extends TaskSlotPayload> implements TaskSlotTab
 			LOG.info("Free slot {}.", taskSlot);
 		}
 
+		//TODO 判断Slot上有没有运行任务
 		if (taskSlot.isEmpty()) {
 			// remove the allocation id to task slot mapping
 			allocatedSlots.remove(allocationId);
@@ -432,6 +437,7 @@ public class TaskSlotTableImpl<T extends TaskSlotPayload> implements TaskSlotTab
 			}
 
 			taskSlots.remove(taskSlot.getIndex());
+			//TODO 将Slot设置为待释放状态
 			budgetManager.release(taskSlot.getResourceProfile());
 		}
 		return taskSlot.closeAsync(cause);

@@ -909,6 +909,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		log.info("Receive slot request {} for job {} from resource manager with leader id {}.",
 			allocationId, jobId, resourceManagerId);
 
+		//TODO 检查TaskExecutor是否与ResourceManager建立连接
 		if (!isConnectedToResourceManager(resourceManagerId)) {
 			final String message = String.format("TaskManager is not connected to the resource manager %s.", resourceManagerId);
 			log.debug(message);
@@ -933,6 +934,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 		} catch (Exception e) {
 			// free the allocated slot
 			try {
+				//TODO 通过taskSlotTable释放该Slot
 				taskSlotTable.freeSlot(allocationId);
 			} catch (SlotNotFoundException slotNotFoundException) {
 				// slot no longer existent, this should actually never happen, because we've
@@ -941,9 +943,11 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 			}
 
 			// release local state under the allocation id.
+			//TODO 对于开启Local Recovery的本地状态释放对应的分配ID的数据
 			localStateStoresManager.releaseLocalStateForAllocationId(allocationId);
 
 			// sanity check
+			//TODO 检查Slot是否空闲
 			if (!taskSlotTable.isSlotFree(slotId.getSlotNumber())) {
 				onFatalError(new Exception("Could not free slot " + slotId));
 			}
@@ -974,19 +978,24 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 			JobID jobId,
 			AllocationID allocationId,
 			ResourceProfile resourceProfile) throws SlotAllocationException {
+		//TODO 判断申请分配的Slot是否空闲
 		if (taskSlotTable.isSlotFree(slotId.getSlotNumber())) {
+			//TODO 调用TaskSlotTable的allocateSlot方法占有Slot
 			if (taskSlotTable.allocateSlot(slotId.getSlotNumber(), jobId, allocationId, resourceProfile, taskManagerConfiguration.getTimeout())) {
 				log.info("Allocated slot for {}.", allocationId);
 			} else {
 				log.info("Could not allocate slot for {}.", allocationId);
+				//TODO 返回已被占用的异常
 				throw new SlotAllocationException("Could not allocate slot.");
 			}
+			//TODO 判断SlotId对应的Slot是否已被本次的申请占有
 		} else if (!taskSlotTable.isAllocated(slotId.getSlotNumber(), jobId, allocationId)) {
 			final String message = "The slot " + slotId + " has already been allocated for a different job.";
 
 			log.info(message);
 
 			final AllocationID allocationID = taskSlotTable.getCurrentAllocation(slotId.getSlotNumber());
+			//TODO 返回已被占有的异常
 			throw new SlotOccupiedException(message, allocationID, taskSlotTable.getOwningJob(allocationID));
 		}
 	}
@@ -1270,6 +1279,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
 	private void offerSlotsToJobManager(final JobID jobId) {
 		jobTable
+			//TODO 判断是否与JobManager建立连接
 			.getConnection(jobId)
 			.ifPresent(this::internalOfferSlotsToJobManager);
 	}
@@ -1277,11 +1287,13 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	private void internalOfferSlotsToJobManager(JobTable.Connection jobManagerConnection) {
 		final JobID jobId = jobManagerConnection.getJobId();
 
+		//TODO 检测TaskSlotTable中是否存在已被该作业占有的Slot(Allocated状态)
 		if (taskSlotTable.hasAllocatedSlots(jobId)) {
 			log.info("Offer reserved slots to the leader of job {}.", jobId);
 
 			final JobMasterGateway jobMasterGateway = jobManagerConnection.getJobManagerGateway();
 
+			//TODO 筛选出已被占有但处于不活跃状态(Allocated)的所有Slot
 			final Iterator<TaskSlot<Task>> reservedSlotsIterator = taskSlotTable.getAllocatedSlots(jobId);
 			final JobMasterId jobMasterId = jobManagerConnection.getJobMasterId();
 
@@ -1289,14 +1301,17 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 
 			while (reservedSlotsIterator.hasNext()) {
 				SlotOffer offer = reservedSlotsIterator.next().generateSlotOffer();
+				//TODO 组装成Slot提供信息列表，包括allocateId，Slot下标slotIndex和Slot对应的资源规格
 				reservedSlots.add(offer);
 			}
 
+			//TODO 将Slot信息列表提供给JobMaster
 			CompletableFuture<Collection<SlotOffer>> acceptedSlotsFuture = jobMasterGateway.offerSlots(
 				getResourceID(),
 				reservedSlots,
 				taskManagerConfiguration.getTimeout());
 
+			//TODO offerSlots请求返回提供Slot情况的消息时，调用handleAcceptedSlotOffers方法处理消息
 			acceptedSlotsFuture.whenCompleteAsync(
 				handleAcceptedSlotOffers(jobId, jobMasterGateway, jobMasterId, reservedSlots),
 				getMainThreadExecutor());
@@ -1309,14 +1324,17 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 	private BiConsumer<Iterable<SlotOffer>, Throwable> handleAcceptedSlotOffers(JobID jobId, JobMasterGateway jobMasterGateway, JobMasterId jobMasterId, Collection<SlotOffer> offeredSlots) {
 		return (Iterable<SlotOffer> acceptedSlots, Throwable throwable) -> {
 			if (throwable != null) {
+				//TODO 如果是请求超时导致的timeoutException
 				if (throwable instanceof TimeoutException) {
 					log.info("Slot offering to JobManager did not finish in time. Retrying the slot offering.");
 					// We ran into a timeout. Try again.
+					//TODO 重试
 					offerSlotsToJobManager(jobId);
 				} else {
 					log.warn("Slot offering to JobManager failed. Freeing the slots " +
 						"and returning them to the ResourceManager.", throwable);
 
+					//TODO 如果是其他异常，会将SlotOffer列表对应的TaskSlot释放掉
 					// We encountered an exception. Free the slots and return them to the RM.
 					for (SlotOffer reservedSlot: offeredSlots) {
 						freeSlotInternal(reservedSlot.getAllocationId(), throwable);
@@ -1324,14 +1342,18 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 				}
 			} else {
 				// check if the response is still valid
+				//TODO 当返回的结果是提供Slot成功的列表，检测是否与JobManager连接
 				if (isJobManagerConnectionValid(jobId, jobMasterId)) {
 					// mark accepted slots active
+					//TODO 将提供成功的TaskSlot由已分配(Allocated)状态标记为活跃(Active)状态
 					for (SlotOffer acceptedSlot : acceptedSlots) {
 						try {
+							//TODO 并移除在timeService中注册的超时检测逻辑(markSlotActive方法)
 							if (!taskSlotTable.markSlotActive(acceptedSlot.getAllocationId())) {
 								// the slot is either free or releasing at the moment
 								final String message = "Could not mark slot " + jobId + " active.";
 								log.debug(message);
+								//TODO 对于转换失败的Slot，通过JobMaster调用failSlot方法以失败的方式释放
 								jobMasterGateway.failSlot(
 									getResourceID(),
 									acceptedSlot.getAllocationId(),
@@ -1351,6 +1373,7 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
 					final Exception e = new Exception("The slot was rejected by the JobManager.");
 
 					for (SlotOffer rejectedSlot : offeredSlots) {
+						//TODO 对于未成功提供的Slot，通过freeSlotInternal释放
 						freeSlotInternal(rejectedSlot.getAllocationId(), e);
 					}
 				} else {

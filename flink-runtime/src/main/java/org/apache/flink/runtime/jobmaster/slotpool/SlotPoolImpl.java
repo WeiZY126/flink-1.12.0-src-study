@@ -583,14 +583,18 @@ public class SlotPoolImpl implements SlotPool {
 	private void tryFulfillSlotRequestOrMakeAvailable(AllocatedSlot allocatedSlot) {
 		Preconditions.checkState(!allocatedSlot.isUsed(), "Provided slot is still in use.");
 
+		//TODO 检查存在资源匹配的待分配Slot请求
 		final PendingRequest pendingRequest = findMatchingPendingRequest(allocatedSlot);
 
+		//TODO 如果存在
 		if (pendingRequest != null) {
 			log.debug("Fulfilling pending slot request [{}] with slot [{}]",
 				pendingRequest.getSlotRequestId(), allocatedSlot.getAllocationId());
 
 			removePendingRequest(pendingRequest.getSlotRequestId());
 
+			//TODO 将汇报Slot对应的allocatedSlot添加到已分配列表中
+			//并将Slot返回，供作业对应的Task的调度
 			allocatedSlots.add(pendingRequest.getSlotRequestId(), allocatedSlot);
 			pendingRequest.getAllocatedSlotFuture().complete(allocatedSlot);
 
@@ -603,6 +607,7 @@ public class SlotPoolImpl implements SlotPool {
 				maybeRemapOrphanedAllocation(allocationIdOfRequest.get(), allocatedSlot.getAllocationId());
 			}
 		} else {
+			//TODO 如果不存在，将Slot添加到可用的Slot列表(availableSlots)中
 			log.debug("Adding slot [{}] to available slots", allocatedSlot.getAllocationId());
 			availableSlots.add(allocatedSlot, clock.relativeTimeMillis());
 		}
@@ -611,6 +616,8 @@ public class SlotPoolImpl implements SlotPool {
 	private PendingRequest findMatchingPendingRequest(final AllocatedSlot slot) {
 		final ResourceProfile slotResources = slot.getResourceProfile();
 
+		//TODO 检查待分配的Slot请求列表pendingRequests和待连接ResourceManager的请求列表waitingForResourceManager中
+		// 是否存在资源匹配的pendingRequests
 		// try the requests sent to the resource manager first
 		for (PendingRequest request : pendingRequests.values()) {
 			if (slotResources.isMatching(request.getResourceProfile())) {
@@ -665,16 +672,21 @@ public class SlotPoolImpl implements SlotPool {
 
 		ArrayList<SlotOffer> result = new ArrayList<>(offers.size());
 
+		//TODO 遍历汇报的Slot信息列表
 		for (SlotOffer offer : offers) {
+			//TODO 调用offerSlot方法，实现将Slot添加到SlotPool的逻辑
+			//SlotOffer和Executor一致，SlotOffer和TaskManagerLocation确定唯一的Slot
 			if (offerSlot(
 				taskManagerLocation,
 				taskManagerGateway,
 				offer)) {
 
+				//TODO 如果添加成功，将Slot信息添加到成功提供的列表中
 				result.add(offer);
 			}
 		}
 
+		//TODO 将添加成功的Slot信息返回给TaskExecutor
 		return result;
 	}
 
@@ -700,6 +712,7 @@ public class SlotPoolImpl implements SlotPool {
 		final ResourceID resourceID = taskManagerLocation.getResourceID();
 		final AllocationID allocationID = slotOffer.getAllocationId();
 
+		//TODO 检查TaskExecutor是否已经注册，如果不在，则提供失败
 		if (!registeredTaskManagers.contains(resourceID)) {
 			log.debug("Received outdated slot offering [{}] from unregistered TaskManager: {}",
 					slotOffer.getAllocationId(), taskManagerLocation);
@@ -708,6 +721,7 @@ public class SlotPoolImpl implements SlotPool {
 
 		// check whether we have already using this slot
 		AllocatedSlot existingSlot;
+		//TODO 检查该Slot的allocationID是否已经汇报过，包括已分配列表和可用列表
 		if ((existingSlot = allocatedSlots.get(allocationID)) != null ||
 			(existingSlot = availableSlots.get(allocationID)) != null) {
 
@@ -721,15 +735,18 @@ public class SlotPoolImpl implements SlotPool {
 			final SlotID existingSlotId = existingSlot.getSlotId();
 			final SlotID newSlotId = new SlotID(taskManagerLocation.getResourceID(), slotOffer.getSlotIndex());
 
+			//TODO 检查已分配的Slot和汇报的Slot是否拥有同样的SlotId
 			if (existingSlotId.equals(newSlotId)) {
 				log.info("Received repeated offer for slot [{}]. Ignoring.", allocationID);
 
 				// return true here so that the sender will get a positive acknowledgement to the retry
 				// and mark the offering as a success
+				//TODO 是的话返回成功，汇报Slot具有幂等性
 				return true;
 			} else {
 				// the allocation has been fulfilled by another slot, reject the offer so the task executor
 				// will offer the slot to the resource manager
+				//TODO 否则返回因allocationID已被其他Slot占有而失败
 				return false;
 			}
 		}
@@ -742,6 +759,7 @@ public class SlotPoolImpl implements SlotPool {
 			taskManagerGateway);
 
 		// use the slot to fulfill pending request, in requested order
+		//TODO 满足其他分配请求
 		tryFulfillSlotRequestOrMakeAvailable(allocatedSlot);
 
 		// we accepted the request in any case. slot will be released after it idled for

@@ -561,9 +561,11 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 			final Collection<SlotOffer> slots,
 			final Time timeout) {
 
+		//TODO 检查汇报的TaskExecutor是否已经注册过(是否在registeredTaskManagers列表中)
 		Tuple2<TaskManagerLocation, TaskExecutorGateway> taskManager = registeredTaskManagers.get(taskManagerId);
 
 		if (taskManager == null) {
+			//TODO 如果没有注册，返回未知TaskExecutor异常
 			return FutureUtils.completedExceptionally(new Exception("Unknown TaskManager " + taskManagerId));
 		}
 
@@ -573,6 +575,7 @@ public class JobMaster extends FencedRpcEndpoint<JobMasterId> implements JobMast
 		final RpcTaskManagerGateway rpcTaskManagerGateway = new RpcTaskManagerGateway(taskExecutorGateway, getFencingToken());
 
 		return CompletableFuture.completedFuture(
+			//TODO 处理Slot逻辑
 			slotPool.offerSlots(
 				taskManagerLocation,
 				rpcTaskManagerGateway,

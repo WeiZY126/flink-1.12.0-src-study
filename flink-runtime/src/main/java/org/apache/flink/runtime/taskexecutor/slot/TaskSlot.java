@@ -301,6 +301,7 @@ public class TaskSlot<T extends TaskSlotPayload> implements AutoCloseableAsync {
 			if (!isEmpty()) {
 				// we couldn't free the task slot because it still contains task, fail the tasks
 				// and set the slot state to releasing so that it gets eventually freed
+				//TODO 将运行的任务以其所在的Slot原因转换为Failed状态
 				tasks.values().forEach(task -> task.failExternally(cause));
 			}
 
