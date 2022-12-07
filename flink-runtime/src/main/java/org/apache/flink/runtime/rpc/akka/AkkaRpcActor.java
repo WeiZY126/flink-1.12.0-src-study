@@ -147,13 +147,16 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 	}
 
 	private void handleMessage(final Object message) {
+		//TODO 检查AkkaRpcActor是否处于Running状态
 		if (state.isRunning()) {
+			//TODO 主线程赋值为当前线程
 			mainThreadValidator.enterMainThread();
 
 			try {
-				//处理RPC消息
+				//TODO 处理RPC消息
 				handleRpcMessage(message);
 			} finally {
+				//TODO 主线程设置为空
 				mainThreadValidator.exitMainThread();
 			}
 		} else {
@@ -253,9 +256,12 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 		Method rpcMethod = null;
 
 		try {
+			//TODO 获取RpcInvocation对应调用的方法名和参数列表
+			// 消息存在序列化和反序列化过程，如果发生异常，会封装成RpcConnectionException返回给发送者
 			String methodName = rpcInvocation.getMethodName();
 			Class<?>[] parameterTypes = rpcInvocation.getParameterTypes();
 
+			//TODO 接着在RpcEndpoint实现类对象中查找对应方法名和参数列表的方法
 			rpcMethod = lookupRpcMethod(methodName, parameterTypes);
 		} catch (ClassNotFoundException e) {
 			log.error("Could not load method arguments.", e);
@@ -268,6 +274,7 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 			RpcConnectionException rpcException = new RpcConnectionException("Could not deserialize rpc invocation message.", e);
 			getSender().tell(new Status.Failure(rpcException), getSelf());
 		} catch (final NoSuchMethodException e) {
+			//TODO 如果不存在，返回方法不存在的异常，并发送给消息发送者
 			log.error("Could not find rpc method for rpc invocation.", e);
 
 			RpcConnectionException rpcException = new RpcConnectionException("Could not find rpc method for rpc invocation.", e);
@@ -280,6 +287,7 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 				rpcMethod.setAccessible(true);
 
 				if (rpcMethod.getReturnType().equals(Void.TYPE)) {
+					//TODO 如果返回类型是Void，直接通过反射执行查找到的方法，如无异常，不回复任何消息
 					// No return value to send back
 					rpcMethod.invoke(rpcEndpoint, rpcInvocation.getArgs());
 				}
@@ -299,9 +307,12 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 					final String methodName = rpcMethod.getName();
 
 					if (result instanceof CompletableFuture) {
+						//TODO 如果返回类型是CompletableFuture，通过反射执行方法返回结果的CompletableFuture，在CompletableFuture完成（onComplete）情况下
+						// 将结果返回个发送者
 						final CompletableFuture<?> responseFuture = (CompletableFuture<?>) result;
 						sendAsyncResponse(responseFuture, methodName);
 					} else {
+						//TODO 其他类型，直接将执行结果通过tell模式返回给发送者
 						sendSyncResponse(result, methodName);
 					}
 				}
@@ -383,8 +394,10 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 	 */
 	private void handleCallAsync(CallAsync callAsync) {
 		try {
+			//TODO 执行CallAsync中的Callable任务
 			Object result = callAsync.getCallable().call();
 
+			//TODO 结果通过tell模式发送给CallAsync消息的发送方
 			getSender().tell(new Status.Success(result), getSelf());
 		} catch (Throwable e) {
 			getSender().tell(new Status.Failure(e), getSelf());
@@ -400,10 +413,10 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 	private void handleRunAsync(RunAsync runAsync) {
 		final long timeToRun = runAsync.getTimeNanos();
 		final long delayNanos;
-
 		if (timeToRun == 0 || (delayNanos = timeToRun - System.nanoTime()) <= 0) {
 			// run immediately
 			try {
+				//TODO 如果执行时间为0或者早于当前时间，立即执行RunAsync中的Runnable方法
 				runAsync.getRunnable().run();
 			} catch (Throwable t) {
 				log.error("Caught exception while executing runnable in main thread.", t);
@@ -411,6 +424,7 @@ class AkkaRpcActor<T extends RpcEndpoint & RpcGateway> extends AbstractActor {
 			}
 		}
 		else {
+			//TODO 否则将RunAsync消息发送给该AkkaRpcActor，加入延迟任务，延迟时间后又会接收到该消息
 			// schedule for later. send a new message after the delay, which will then be immediately executed
 			FiniteDuration delay = new FiniteDuration(delayNanos, TimeUnit.NANOSECONDS);
 			RunAsync message = new RunAsync(runAsync.getRunnable(), timeToRun);
