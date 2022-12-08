@@ -215,15 +215,19 @@ public class AkkaRpcService implements RpcService {
 	}
 
 	@Override
+	//TODO 1、创建于启动AkkaRpcActor，用来接收和处理消息
+	// 2、构建RpcServer代理对象，使用发消息给AkkaRpcActor的方式实现状态的线程安全操作
 	public <C extends RpcEndpoint & RpcGateway> RpcServer startServer(C rpcEndpoint) {
 		checkNotNull(rpcEndpoint, "rpc endpoint");
 
+		//TODO 创建并启动Actor
 		final SupervisorActor.ActorRegistration actorRegistration = registerAkkaRpcActor(rpcEndpoint);
 		final ActorRef actorRef = actorRegistration.getActorRef();
 		final CompletableFuture<Void> actorTerminationFuture = actorRegistration.getTerminationFuture();
 
 		LOG.info("Starting RPC endpoint for {} at {} .", rpcEndpoint.getClass().getName(), actorRef.path());
 
+		//TODO 构建RpcServer代理对象
 		final String akkaAddress = AkkaUtils.getAkkaURL(actorSystem, actorRef);
 		final String hostname;
 		Option<String> host = actorRef.path().address().host();
@@ -240,6 +244,8 @@ public class AkkaRpcService implements RpcService {
 
 		final InvocationHandler akkaInvocationHandler;
 
+		//TODO 根据是否带FencedToken访问的RpcEndpoint实现对象
+		// 创建不同类型的AkkaInvocationHandler来与AkkaActor交互，实现方法线程的安全调用
 		if (rpcEndpoint instanceof FencedRpcEndpoint) {
 			// a FencedRpcEndpoint needs a FencedAkkaInvocationHandler
 			akkaInvocationHandler = new FencedAkkaInvocationHandler<>(
@@ -271,6 +277,8 @@ public class AkkaRpcService implements RpcService {
 
 		@SuppressWarnings("unchecked")
 			/*TODO 通过代理转发，最终转发到InvocationHandler进行处理*/
+			//TODO 根据RpcEndpoint实现类对象的接口中所有继承RpcGateway的接口、RpcServer接口、AkkaBasedEndpoint接口构建RpcServer代理对象
+			// 对于FencedRpcEndpoint实现类对象，代理对象会多实现FencedMainThreadExecutable接口
 		RpcServer server = (RpcServer) Proxy.newProxyInstance(
 			classLoader,
 			implementedRpcGateways.toArray(new Class<?>[implementedRpcGateways.size()]),
@@ -282,6 +290,7 @@ public class AkkaRpcService implements RpcService {
 	private <C extends RpcEndpoint & RpcGateway> SupervisorActor.ActorRegistration registerAkkaRpcActor(C rpcEndpoint) {
 		final Class<? extends AbstractActor> akkaRpcActorType;
 
+		//TODO 判断是否带要带FenceToken访问的RpcEndpoint实现类对象
 		if (rpcEndpoint instanceof FencedRpcEndpoint) {
 			akkaRpcActorType = FencedAkkaRpcActor.class;
 		} else {
@@ -291,6 +300,7 @@ public class AkkaRpcService implements RpcService {
 		synchronized (lock) {
 			checkState(!stopped, "RpcService is stopped");
 
+			//TODO 创建bin启动AkkaRpcActor
 			final SupervisorActor.StartAkkaRpcActorResponse startAkkaRpcActorResponse = SupervisorActor.startAkkaRpcActor(
 				supervisor.getActor(),
 				actorTerminationFuture -> Props.create(

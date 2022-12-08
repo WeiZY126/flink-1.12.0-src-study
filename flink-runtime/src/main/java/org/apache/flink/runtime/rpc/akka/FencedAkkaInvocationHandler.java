@@ -54,7 +54,7 @@ public class FencedAkkaInvocationHandler<F extends Serializable> extends AkkaInv
 
 	private final Supplier<F> fencingTokenSupplier;
 
-	public FencedAkkaInvocationHandler(
+	public  FencedAkkaInvocationHandler(
 			String address,
 			String hostname,
 			ActorRef rpcEndpoint,
