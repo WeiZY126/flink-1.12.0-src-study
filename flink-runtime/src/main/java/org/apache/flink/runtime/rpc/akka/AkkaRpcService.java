@@ -171,11 +171,20 @@ public class AkkaRpcService implements RpcService {
 	}
 
 	// this method does not mutate state and is thus thread-safe
+
+	/**
+	 * *
+	 * @param address Address of the remote rpc server
+	 * @param clazz Class of the rpc gateway to return,TaskExecutorGateWay.class、JobMasterGateway.class、ResourceManagerGateway.class、DispatcherGateway.class
+	 * @param <C>
+	 * @return
+	 */
 	@Override
 	public <C extends RpcGateway> CompletableFuture<C> connect(
 			final String address,
 			final Class<C> clazz) {
 
+		//TODO 第三个参数提供一个根据actorRef返回AkkaInvocationHandler的函数
 		return connectInternal(
 			address,
 			clazz,
@@ -492,8 +501,11 @@ public class AkkaRpcService implements RpcService {
 		LOG.debug("Try to connect to remote RPC endpoint with address {}. Returning a {} gateway.",
 			address, clazz.getName());
 
+		//TODO 获取匹配ActorRef的Future
 		final CompletableFuture<ActorRef> actorRefFuture = resolveActorAddress(address);
 
+		//TODO 往ActorRef发送RemoteHandshakeMessage消息，与对应Actor组件握手建立联系
+		// 属于Flink内部Actor建立通信的握手，其中Actor会检测两个Actor版本是否兼容，是否支持握手来判断成功
 		final CompletableFuture<HandshakeSuccessMessage> handshakeFuture = actorRefFuture.thenCompose(
 			(ActorRef actorRef) -> FutureUtils.toJava(
 				Patterns
@@ -510,6 +522,7 @@ public class AkkaRpcService implements RpcService {
 				// code is loaded dynamically (for example from an OSGI bundle) through a custom ClassLoader
 				ClassLoader classLoader = getClass().getClassLoader();
 
+				//TODO 根据入参提供的class，AkkaInvocationHandler，通过代理类创建集成RpcGateway接口的代理对象
 				@SuppressWarnings("unchecked")
 				C proxy = (C) Proxy.newProxyInstance(
 					classLoader,
@@ -522,8 +535,10 @@ public class AkkaRpcService implements RpcService {
 	}
 
 	private CompletableFuture<ActorRef> resolveActorAddress(String address) {
+		//TODO 通过actorSelection方式获取远程ActorSystem
 		final ActorSelection actorSel = actorSystem.actorSelection(address);
 
+		//TODO 使用ActorSelection的resolveOne方法，它会返回一个包含匹配ActorRef的Future
 		return actorSel.resolveOne(TimeUtils.toDuration(configuration.getTimeout()))
 			.toCompletableFuture()
 			.exceptionally(error -> {

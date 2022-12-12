@@ -125,14 +125,17 @@ class AkkaInvocationHandler implements InvocationHandler, AkkaBasedEndpoint, Rpc
 			declaringClass.equals(MainThreadExecutable.class) ||
 			declaringClass.equals(RpcServer.class)) {
 			/*TODO 如果是网管类的调用，走这里*/
+			//TODO 用于RpcServer调用相应方法时(如runAsync、callAsync)
 			result = method.invoke(this, args);
 		} else if (declaringClass.equals(FencedRpcGateway.class)) {
+			//TODO 不支持，直接抛出异常，该接口的方法只有getFencingToken
 			throw new UnsupportedOperationException("AkkaInvocationHandler does not support the call FencedRpcGateway#" +
 				method.getName() + ". This indicates that you retrieved a FencedRpcGateway without specifying a " +
 				"fencing token. Please use RpcService#connect(RpcService, F, Time) with F being the fencing token to " +
 				"retrieve a properly FencedRpcGateway.");
 		} else {
 			/*TODO 如果不是网关类的，走这里，处理RPC请求*/
+			//TODO 用于集成RpcGateway接口的代理对象调用相应的方法时
 			result = invokeRpc(method, args);
 		}
 
